@@ -158,7 +158,9 @@ def create_app(
     ) -> dict[str, Any]:
         remote = get_remote(remote_id)
         require_store(remote, store)
-        if ns and (not _NAMESPACE.fullmatch(ns) or any(\n            part in (\".\", \"..\") for part in ns.split(\"/\")\n        )):
+        if ns and (not _NAMESPACE.fullmatch(ns) or any(
+            part in (".", "..") for part in ns.split("/")
+        )):
             raise HTTPException(422, detail="Invalid namespace")
         params = {"ns": ns} if ns else None
         return {

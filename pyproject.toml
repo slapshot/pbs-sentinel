@@ -23,8 +23,16 @@ classifiers = [
   "Topic :: System :: Archiving :: Backup",
 ]
 
+[project.optional-dependencies]
+web = [
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.30,<1",
+  "httpx>=0.27,<1",
+]
+
 [project.scripts]
 pbs-sentinel = "pbs_sentinel.cli:main"
+pbs-sentinel-web = "pbs_sentinel.web:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

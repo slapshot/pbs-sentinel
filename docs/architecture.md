@@ -1,76 +1,67 @@
 # Architecture
 
-## Goals and boundaries
+**Current product direction: central self-hosted web application.** The offline CLI remains a utility, not the intended user interface.
 
-PBS Sentinel starts as a **read-only local audit CLI**, designed for Proxmox Backup Server administrators. Later milestones may include remote API discovery and carefully fenced repair operations. We deliberately do **not** implement a custom backup protocol, index writer, or deduplication engine.
-
-The primary separation is:
+## Components
 
 ```text
-Command interface (CLI)
-      |
-      v
-Audit orchestration
-  |        |
-  v        v
-Inventory  GC-log parser         [later: native PBS API adapters]
-  \        /
-   \      /
-    Findings + evidence
-          |
-          v
-     JSON / text output
-          |
-          v
-    [later: reviewed plans]
-          |
-          v
-    [later: opt-in executor]
+Browser
+   |
+   | HTTPS + upstream SSO/MFA in production
+   v
+Reverse proxy
+   | SPA assets             | /api/*
+   v                        v
+React/Vite                 FastAPI gateway
+                               |
+                     Allowlisted HTTPS :8007
+                       /       |       \
+                      PBS A   PBS B   PBS N
 ```
 
-## Milestone 0: offline inspection (dev)
+The browser never talks directly to PBS. All remote credentials stay on the server, and **no browser-supplied arbitrary URL** is allowed to reach the upstream client. Each remote has a datastore allowlist and a server-side API token. The web backend has no mutation routes.
 
-- `audit --datastore-path <path>`: inspect `vm/`, `ct/`, `host/` root groups and the corresponding namespace trees under `ns/`.
-- Collect backup-group type, identifier, namespace, owner (when readable), snapshot timestamps and count.
-- Detect root namespace groups and duplicate `(type, id)` across multiple namespaces as **review items**, never proof of incorrect placement.
-- `--gc-log <file>`: parse `warning: unable to access non-existent chunk <64-hex>, required by "<index path>"`; identify the chunk and referenced index path.
-- `--format json|text`: deterministic results, safe for CI/reporting.
-- The tool never opens snapshot archives, never reads raw chunk payloads, never runs `verify` and never interprets a directory count as integrity assurance.
+See [web architecture](web-architecture.md) for endpoints, run commands and production hardening.
 
-## Planned adapters (not implemented)
+## Runtime layers
 
-### Remote PBS API adapter
+1. **API gateway:** `src/pbs_sentinel/web_api.py` (FastAPI) exposes only GET endpoints, scoped by remote and datastore. Uniform error responses do not include credentials or upstream exception strings.
+2. **Configuration:** `src/pbs_sentinel/web_config.py` loads a static JSON allowlist; secret values are resolved from server environment variables, not JSON.
+3. **Web UI:** `web/` is a responsive React SPA, hosted on the same HTTPS origin as the API. A dev-only shared bearer access token is kept in memory. Per-user identity/SSO/MFA is required for public production access and remains future work.
+4. **Offline CLI:** `src/pbs_sentinel/cli.py` runs read-only audits of PBS-shaped datastore directories and saved GC logs. It remains useful when API access is unavailable.
+5. **Future evidence/incident engine:** normalized verify, GC and prune task information, namespace drift, missing-chunk cross-store lookup, immutable reports and reviewed recovery proposals.
 
-Use HTTPS port 8007 and official Proxmox API endpoints. Authenticate with scoped API tokens; validate server TLS certificates or an explicitly pinned fingerprint. Consider dedicated read-only permissions and pagination. The endpoint and response shapes must be validated against supported PBS versions before implementation.
+## Safety invariants
 
-### Optional local filesystem probe
+- No write endpoints in the current server.
+- No background shell, arbitrary command execution, raw chunk download or client-provided upstream URL.
+- No secret in browser API responses, logs or repository.
+- Host provenance is not inferred from VMID alone.
+- Neither a successful backup nor a metadata inventory proves data can be restored.
+- PBS native Verify and isolated restore drills remain the authoritative tests.
+- Any future action executor must be separately gated, dry-run first, validate digests and never overwrite existing chunks.
 
-Advanced chunk checks require host-local access and cannot be implemented solely via the management API. Prefer an explicitly installed read-only agent or operator-executed signed plan. **Never expose raw chunk paths or write methods through a generic remote shell API.**
+## First supported API routes
 
-### Recovery planner and executor
+- `GET /api/v1/health`
+- `GET /api/v1/instances`
+- `GET /api/v1/instances/{id}/version`
+- `GET /api/v1/instances/{id}/datastores`
+- `GET /api/v1/instances/{id}/datastores/{store}/status`
+- `GET /api/v1/instances/{id}/datastores/{store}/namespaces`
+- `GET /api/v1/instances/{id}/datastores/{store}/groups?ns=...`
 
-1. Ingest verified GC/verify findings; capture original repository, datastore, namespace, snapshot and checksum.
-2. Search alternate datastores; compare stored-file hashes and decode to validate actual chunk digest.
-3. Produce a plan with explicit source/destination, bytes, required privileges, expected ownership and rollback limitations.
-4. Operator approves each target; revalidate preconditions immediately before write.
-5. Install with atomic no-clobber operations; never overwrite a pre-existing chunk, never fabricate chunks, never edit PBS index files.
-6. Run official PBS verify and recommend isolated restore testing.
+Except for health, a Sentinel-specific bearer token is required. The backend uses PBS API tokens per remote.
 
-A completed `group move` or matching snapshot count does **not** prove backup integrity.
+## Test boundaries
 
-## Environment support
+- Python >= 3.11; backend FastAPI/httpx are installed via the `[web]` optional extra.
+- UI: React/Vite, built with Node.js.
+- Unit tests use synthetic datastore fixtures and an isolated mocked PBS HTTP transport; real systems are never targeted by CI.
+- The next acceptance gate is a read-only smoke test against a **test PBS user with minimal privileges**. Support for specific PBS versions cannot be asserted until that test is completed.
 
-- Python >= 3.11; standard library only for the initial CLI.
-- Linux and other platforms for GC-log parsing; local directory audits require access to the datastore filesystem.
-- PBS 4.x incident scenarios motivate design but **version support is not asserted without compatibility tests**.
-- No database, daemon, web UI or privileged agent in the first milestone.
+## Future design
 
-## Error handling and testing
+Task collectors and incident reports should use an asynchronous queue and durable history, but we will not introduce a database or background scheduler until the requirements justify it. A remote mutation agent is **not part of the current MVP**.
 
-Fail closed for malformed inputs and inaccessible root paths. Record individual non-critical filesystem anomalies as findings rather than silently discarding them. Deterministic sorting, fixture-based tests with synthetic paths/VMIDs and no network requirement. Tests must never touch a real PBS datastore.
-
-## Ownership / provenance limitations
-
-The same VMID may belong to unrelated nodes. PBS group name alone cannot prove source ownership. Additional provenance evidence must come from job definitions, VM/CT configuration, notes and trusted operator annotations. The MVP flags ambiguity; it **does not automatically attribute groups to hosts**.
-
-See [data model](data-model.md) and [security](security.md).
+See [security](security.md), [comparison](comparison.md), [roadmap](roadmap.md).

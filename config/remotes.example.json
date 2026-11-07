@@ -1,0 +1,13 @@
+{
+  "remotes": [
+    {
+      "id": "pbs-primary",
+      "label": "Primary PBS",
+      "base_url": "https://pbs.example.invalid:8007",
+      "datastores": ["backup"],
+      "token_id": "sentinel@pbs!readonly",
+      "token_secret_env": "PBS_SENTINEL_PBS_PRIMARY_TOKEN",
+      "ca_bundle": "/etc/ssl/certs/ca-certificates.crt"
+    }
+  ]
+}

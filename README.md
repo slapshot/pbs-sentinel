@@ -1,49 +1,73 @@
 # PBS Sentinel
 
-**Backup integrity, namespace hygiene and recovery planning for Proxmox Backup Server.**
+**Web-first backup visibility and integrity investigation for Proxmox Backup Server.**
 
-PBS Sentinel is a community-driven, safety-first operations toolkit for administrators who run multiple Proxmox VE and Proxmox Backup Server instances. It addresses a specific gap: *understanding whether backup groups are correctly attributed and which data needs attention before attempting a recovery.*
+PBS Sentinel is a self-hosted web application for operators managing multiple Proxmox Backup Server instances. It adds a specific layer around **backup provenance, namespace organization, missing-chunk investigations, and reviewed recovery plans**. It is an independent open-source project, not affiliated with Proxmox.
 
-> **Status:** early-stage project. The `main` branch contains the design and operational documentation. Initial read-only code is developed on `dev`. Do not use it as a substitute for PBS verification or restore tests.
+> **Status: pre-alpha.** On `dev` a read-only React dashboard and FastAPI gateway are under development, alongside an offline diagnostic CLI. `main` contains the public documentation. No stable release or internet-ready authentication service is available yet.
 
-## Why it exists
+## The problem
 
-A backup task showing *OK* does not prove that every referenced chunk is available. Backups can also be hard to identify when several independent PVE hosts reuse the same VMID, or when older snapshots live in the root namespace while newer ones live under host-specific namespaces.
+A successful PBS backup task is not proof of complete restoreability. After namespace migrations, multiple hosts can also share VMIDs while backup archives have different owners or histories. In a missing-chunk incident, the operator may need to correlate GC logs, indexes, namespaces and alternate datastores.
 
-PBS Sentinel aims to help operators **audit first, plan second, and change nothing without explicit approval**.
+**PBS Sentinel connects the evidence and presents it through a web UI.** It will never silently delete archives or claim a metadata scan proves integrity.
 
-## What is available
+## Architecture
 
-The documentation describes a staged implementation. The first development milestone is an **offline, read-only datastore audit** with structured output and optional analysis of PBS garbage-collection logs. Namespace moves, cross-datastore chunk recovery, remote API discovery and restore drills remain proposed capabilities, **not completed features**.
+```text
+Authorized browser --HTTPS--> Reverse proxy + authentication
+                                        |
+                        React dashboard / FastAPI
+                                        |
+                             PBS API :8007 (GET)
+                            /         |         \
+                         PBS A       PBS B      PBS N
+```
 
-See [architecture](docs/architecture.md), [security](docs/security.md), [roadmap](docs/roadmap.md), [operations](docs/operations.md), [comparison with other tools](docs/comparison.md) and [data model](docs/data-model.md).
+The browser never connects directly to PBS or receives PBS API tokens. Server-side instance URLs are allowlisted; backend tokens are held in environment secrets. The initial FastAPI MVP binds to `127.0.0.1:8787` and requires an independent bearer token; **do not expose it on the internet without a hardened login gateway (SSO/MFA) and reverse proxy**.
 
-## How it differs
+See [web architecture and development guide](docs/web-architecture.md).
 
-- **[Pulse](https://github.com/rcourtman/Pulse)** focuses on observability, monitoring and alerts across infrastructure; PBS Sentinel focuses on *offline forensic audit, evidence-led recovery plans and namespace provenance*.
-- **[ProxSave](https://github.com/tis24dev/proxsave)** safeguards host configuration and guides host rebuilds; PBS Sentinel focuses on PBS *backup groups, snapshot integrity evidence and chunk availability*.
-- **[pmx](https://github.com/fivetwenty-io/proxmox-cli)** provides a broad API CLI for Proxmox products; PBS Sentinel aims to provide *opinionated, multi-step safety checks* on top of native capabilities.
-- **[foundata.proxmox](https://github.com/foundata/ansible-collection-proxmox)** provides Ansible automation for configuring Proxmox components; PBS Sentinel is intended for *backup audits and guarded recovery workflows*, not general provisioning.
+## What exists on `dev`
 
-These tools are complementary, not competitors. See [comparison](docs/comparison.md) for a feature/status matrix.
+- Read-only API: configured instances, datastore usage, namespaces, backup groups and PBS version.
+- React/Vite web console for selecting an instance/datastore/namespace and viewing group metadata.
+- Local CLI `pbs-sentinel audit` for datastore inventory and saved GC missing-chunk warnings.
+- Synthetic tests and CI.
+- No automatic namespace moves, chunk repair, backup deletion, remote shell or verify-job execution.
 
-## Design principles
+## Roadmap
 
-1. Read-only by default; destructive operations must never be the default.
-2. Use Proxmox APIs and native CLI tools when available; never rewrite index files.
-3. Never infer machine identity solely from VMID; preserve namespace and repository context.
-4. No private infrastructure data or credentials in the repository, fixtures or logs.
-5. Machine-readable evidence, reproducible tests and clear limitations.
+Read-only fleet inventory → task/GC/verify incident overview → evidence-based missing-chunk lookup → reviewed recovery planning → optional controlled executor and restore drills.
 
-## Branch policy
+See [roadmap](docs/roadmap.md), [security](docs/security.md), [architecture](docs/architecture.md), [API](docs/web-architecture.md) and [data model](docs/data-model.md).
 
-- **`main`**: documentation and subsequently reviewed, stable releases.
-- **`dev`**: working code, tests and experimental non-destructive features.
+## How is it different?
 
-## License and trademarks
+- **Proxmox Datacenter Manager** provides centralized management, resource monitoring and multi-cluster operations. PBS Sentinel intentionally focuses on *backup integrity evidence, namespace provenance and recovery workflow design*.
+- **Pulse** focuses on monitoring and alerting; Sentinel on investigation and operator-reviewed remediation plans.
+- **ProxSave** focuses on host configuration recovery; Sentinel on PBS backup group and chunk incidents.
+- **pmx / Ansible** offer broad API or automation foundations; Sentinel adds domain-specific safety and reasoning, not a replacement for those tools.
 
-Apache-2.0 (see [LICENSE](LICENSE)). This is an independent community project, **not affiliated with or endorsed by Proxmox Server Solutions GmbH**. Proxmox is a trademark of its respective owner.
+Read the detailed [comparison with existing projects](docs/comparison.md).
 
-## Contributing
+## Development
 
-Start with [CONTRIBUTING.md](CONTRIBUTING.md). Security-sensitive findings should be reported privately, not through public issues containing hostnames, credentials, snapshots or internal IPs.
+```bash
+git clone https://github.com/slapshot/pbs-sentinel.git
+cd pbs-sentinel && git switch dev
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e '.[web]'
+python -m unittest discover -s tests -v
+```
+
+For the web UI and connection configuration, follow [docs/web-architecture.md](docs/web-architecture.md). The CLI can be run independently.
+
+## Branches and license
+
+- `main`: project documentation and later stable releases.
+- `dev`: active development, tests and pre-release prototypes.
+- Licensed under **Apache-2.0** ([LICENSE](LICENSE)). Proxmox trademarks belong to their owners.
+
+Please do not include real backup data, infrastructure secrets, VM/customer names or private addresses in issues. See [contributing](CONTRIBUTING.md).

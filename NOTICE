@@ -1,0 +1,7 @@
+PBS Sentinel
+Copyright 2026 contributors
+
+This product is independent of Proxmox Server Solutions GmbH.
+Proxmox and Proxmox Backup Server names and trademarks belong to their respective owners.
+
+This project may use Proxmox public APIs and command-line tools as an external dependency; it does not bundle Proxmox code.

@@ -29,7 +29,7 @@ We should reuse those tools and the native PBS client where appropriate. PBS Sen
 
 ## Research references
 
-- [Pulse](https://github.com/rcourtman/Pulse)
+- [Proxmox Datacenter Manager](https://github.com/proxmox/proxmox-datacenter-manager)\n- [Pulse](https://github.com/rcourtman/Pulse)
 - [ProxSave](https://github.com/tis24dev/proxsave)
 - [pmx](https://github.com/fivetwenty-io/proxmox-cli)
 - [foundata.proxmox](https://github.com/foundata/ansible-collection-proxmox)

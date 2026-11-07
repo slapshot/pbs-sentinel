@@ -1,55 +1,58 @@
 # Roadmap
 
-The project is intentionally narrow: **audit -> explain -> plan -> approve**. Avoid feature bloat.
+**Product:** a centralized, self-hosted web application with a read-only API gateway and an optional diagnostic CLI. Do not confuse general Proxmox fleet dashboards with PBS-specific backup integrity analysis.
 
-## M0 — Documentation and OSS scaffolding (main)
+## M0 — Public project foundation (`main`)
 
-- [x] Scope, architecture, comparison, data model and security principles
-- [x] Document branch policy and contribution expectations
-- [x] License Apache-2.0
-- [ ] First tagged release
+- [x] Open-source scope, comparison with other projects and license
+- [x] Security model, data model and contribution policy
+- [x] Web-first architecture and documented API boundaries
+- [ ] First stable tagged release
 
-## M1 — Read-only offline CLI (dev)
+## M1 — Working read-only prototype (`dev`)
 
-- [x] Synthetic datastore layout inventory
-- [x] Find root-namespace groups and namespace ID collisions
-- [x] Parse missing chunk references from PBS GC logs
-- [x] Text and JSON output
-- [x] No runtime third-party dependencies
-- [x] Unit tests, isolated fixtures and basic CI
-- [ ] Test against sanitized exports from multiple PBS versions
-- [ ] Improve handling of unexpectedly large or nonstandard filesystem layouts
+- [x] Offline datastore/namespace inventory and GC warning parser
+- [x] JSON/text CLI and synthetic test fixtures
+- [x] FastAPI server with a static allowlist of PBS endpoints and datastores
+- [x] API token auth to PBS with TLS verification; independent bearer access token for Sentinel
+- [x] GET-only endpoints for instance, datastore, namespace and group metadata
+- [x] Responsive React dashboard preview
+- [x] Automated Python tests and frontend build on CI
+- [ ] Real, permission-scoped PBS smoke test (read-only only)
+- [ ] Browser-level tests, pagination/large-inventory testing, and access-token UX hardening
+- [ ] Reproducible frontend lockfile before release
 
-## M2 — Remote fleet audit (planned)
+## M2 — Production-ready web foundation (planned)
 
-- [ ] API token authentication with TLS validation
-- [ ] Inventory remote datastores, namespaces, group ownership, snapshot metadata, verify tasks
-- [ ] Compare intended PVE storage mappings and actual PBS namespaces
-- [ ] Context-scoped JSON reports; avoid secret-bearing output
-- [ ] Explicit compatibility matrix for PBS/PVE versions
+- [ ] Per-user identity (OIDC/SSO), MFA, authorization roles and sessions
+- [ ] Deployment guides for dedicated LXC/VM, reverse proxy and HTTPS
+- [ ] Central audit trail and server-side secret management
+- [ ] Status refresh, asynchronous collectors and caching/rate limits
+- [ ] Validated API compatibility matrix for PBS 4.x
+- [ ] Accessible responsive UI, browser-level tests and telemetry minimization
 
-## M3 — Evidence-based repair planning (planned)
+## M3 — Backup integrity incident analysis (planned)
 
-- [ ] Missing chunk digest extraction from verify + GC
-- [ ] Search alternate datastores via authorized connectors
-- [ ] Decode and validate candidate chunk integrity (incl. encrypted-data limitations)
-- [ ] Dry-run recovery plan; immutable approval record
-- [ ] Preflight checks and safe, non-clobber executor behind an opt-in switch
-- [ ] Native PBS Verify and isolated restore drill guidance
+- [ ] GC/Verify/task log ingestion and incident timeline
+- [ ] Missing chunk digest mapping to affected backup index and snapshots
+- [ ] Read-only authorized search for alternative chunk copies
+- [ ] Candidate integrity validation with digest/CRC/decode checks; document encryption limits
+- [ ] Operator-readable, replayable recovery proposals; no automatic repair
 
-## M4 — Fleet workflows (planned)
+## M4 — Guarded operations and restore drills (planned)
 
-- [ ] Namespace migration plan with collision and chronological merge validation
-- [ ] Review-only retention/GC policies
-- [ ] Idempotent incident reports and operator runbooks
-- [ ] Optional Ansible integration, metrics export
+- [ ] Namespace migration planner with provenance, owner/collision/time-window evidence
+- [ ] Explicit dry-run and approval workflow
+- [ ] Carefully reviewed non-clobber recovery executor, only after M3 acceptance
+- [ ] Native PBS Verify and isolated restore drill orchestration with explicit permissions
+- [ ] Retention/GC policy audit, no auto-delete
 
 ## Non-goals
 
-- Replacing PBS native backup/restore and verification.
-- Automated deletion of snapshots to silence warnings.
-- Editing index files or manufacturing chunk hashes.
-- Another broad Proxmox dashboard.
-- Storing secrets or production backup contents in this repository.
+- General-purpose Proxmox cluster management or another monitoring suite
+- Reimplementing the native PBS data protocol or editing index files
+- Auto-deleting backups to suppress GC/Verify warnings
+- Treating successful backups or namespace group counts as evidence of integrity
+- Shipping production credentials, topology or backup payloads in source control
 
-See [comparison](comparison.md) for boundaries relative to existing projects.
+See [web architecture](web-architecture.md), [security](security.md) and [comparison](comparison.md).

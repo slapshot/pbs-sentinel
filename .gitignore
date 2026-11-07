@@ -14,3 +14,9 @@ build/
 *.tmp
 reports/
 secrets/
+
+# Local web server configuration and builds
+config/remotes.local.json
+web/node_modules/
+web/dist/
+web/.env*
